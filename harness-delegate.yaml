@@ -1,0 +1,137 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: harness-delegate
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: harness-delegate-cluster-admin
+subjects:
+  - kind: ServiceAccount
+    name: default
+    namespace: harness-delegate
+roleRef:
+  kind: ClusterRole
+  name: cluster-admin
+  apiGroup: rbac.authorization.k8s.io
+
+---
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: demo-proxy
+  namespace: harness-delegate
+type: Opaque
+data:
+  # Enter base64 encoded username and password, if needed
+  PROXY_USER: ""
+  PROXY_PASSWORD: ""
+
+---
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  labels:
+    harness.io/app: harness-delegate
+    harness.io/account: ekqwid
+    harness.io/name: demo
+  # Name must contain the six letter account identifier: ekqwid
+  name: demo-ekqwid
+  namespace: harness-delegate
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      harness.io/app: harness-delegate
+      harness.io/account: ekqwid
+      harness.io/name: demo
+  serviceName: ""
+  template:
+    metadata:
+      labels:
+        harness.io/app: harness-delegate
+        harness.io/account: ekqwid
+        harness.io/name: demo
+    spec:
+      containers:
+      - image: harness/delegate:latest
+        imagePullPolicy: Always
+        name: harness-delegate-instance
+        resources:
+          limits:
+            cpu: "1"
+            memory: "8Gi"
+        readinessProbe:
+          exec:
+            command:
+              - test
+              - -s
+              - delegate.log
+          initialDelaySeconds: 20
+          periodSeconds: 10
+        livenessProbe:
+          exec:
+            command:
+              - bash
+              - -c
+              - '[[ -e /opt/harness-delegate/msg/data/watcher-data && $(($(date +%s000) - $(grep heartbeat /opt/harness-delegate/msg/data/watcher-data | cut -d ":" -f 2 | cut -d "," -f 1))) -lt 300000 ]]'
+          initialDelaySeconds: 240
+          periodSeconds: 10
+          failureThreshold: 2
+        env:
+        - name: ACCOUNT_ID
+          value: EkqWiDXfTGeVpUXtrmBouQ
+        - name: ACCOUNT_SECRET
+          value: 66dbb2ee5a8eb7d4675b8c48ac8adf96
+        - name: MANAGER_HOST_AND_PORT
+          value: https://app.harness.io/gratis
+        - name: WATCHER_STORAGE_URL
+          value: https://app.harness.io/storage/wingswatchers
+        - name: WATCHER_CHECK_LOCATION
+          value: watcherprod.txt
+        - name: DELEGATE_STORAGE_URL
+          value: https://app.harness.io/storage/wingsdelegates
+        - name: DELEGATE_CHECK_LOCATION
+          value: delegatefree.txt
+        - name: DEPLOY_MODE
+          value: KUBERNETES
+        - name: DELEGATE_NAME
+          value: demo
+        - name: DELEGATE_PROFILE
+          value: ""
+        - name: MANAGER_TARGET
+          value: "app.harness.io"
+        - name: MANAGER_AUTHORITY
+          value: "gratis-manager-grpc-app.harness.io"
+        - name: PROXY_HOST
+          value: ""
+        - name: PROXY_PORT
+          value: ""
+        - name: PROXY_SCHEME
+          value: ""
+        - name: NO_PROXY
+          value: ""
+        - name: PROXY_MANAGER
+          value: "true"
+        - name: PROXY_USER
+          valueFrom:
+            secretKeyRef:
+              name: demo-proxy
+              key: PROXY_USER
+        - name: PROXY_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: demo-proxy
+              key: PROXY_PASSWORD
+        - name: POLL_FOR_TASKS
+          value: "false"
+        - name: HELM_DESIRED_VERSION
+          value: ""
+        - name: CF_PLUGIN_HOME
+          value: ""
+      restartPolicy: Always
