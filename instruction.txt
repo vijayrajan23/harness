@@ -1,0 +1,14 @@
+Harness-delegate
+================
+1.delegate.sh
+2.setup-proxy.sh
+3.start.sh
+4.stop.sh
+
+Harness-delegate-docker
+=======================
+1.lanuch-harness-delegate.sh
+
+Harness-delegate-kubernets
+===========================
+1.harness-delegate.ymal
